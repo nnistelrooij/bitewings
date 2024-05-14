@@ -1,0 +1,12 @@
+name,x1,x2,y1,y2,reason
+Den=1_andel__Pat=34718_andel__Img=22d7bb53-5e54-4bb8-a0e9-5b3a615ab797.jpg,500,1100,0,600,pontic
+Den=1_andel__Pat=682_andel__Img=5a93b25a-3d6b-4994-a915-011abcf32df5.jpg,700,1300,350,950,half_seg
+Den=1__Pat=31__Img=2.png,360,660,40,340,wrong_fdi
+Den=1_andel__Pat=33926_andel__Img=b7ea6fbe-184b-4870-b31b-1c2d7dee32b0.jpg,750,1350,0,600,fp
+Den=1_andel__Pat=682_andel__Img=11efdaab-b89d-4287-8043-ed5b65245562.jpg,650,1250,400,1000,enamel_caries
+Den=1__Pat=bb7c248df53869435473dc46157244b0__Img=hfT3aTlDQlqBLaOBX76GyQ.jpeg,400,700,0,300,fn
+Den=1__Pat=6482ed5ac7b34b6923c8782efb60bea6__Img=Bt9ayTZdbSYeRyk9bktL7FtQ.png,400,700,200,500,overlap
+Den=1_andel__Pat=16829_andel__Img=2f4f5291-e43c-4cfe-bead-987e6eb39136.jpg,300,900,0,600,stift
+Den=1_andel__Pat=35716_andel__Img=3fde81f6-beff-4a31-81f6-5de8ca004cf8.png,0,300,0,300,artifact
+Den=1_andel__Pat=27457_andel__Img=eb85b6ce-af90-4fe4-ad7d-342e6e16fea8.jpg,700,1300,0,600,fn_calculus
+Den=1_andel__Pat=16829_andel__Img=618e329c-3d9a-457f-a10a-27eaea9b6072.jpg,400,1000,0,600,fn_implant

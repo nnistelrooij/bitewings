@@ -1,0 +1,298 @@
+from pathlib import Path
+import pickle
+from typing import Optional
+
+import cv2
+import matplotlib.pyplot as plt
+from mmengine.structures import InstanceData
+import numpy as np
+import pandas as pd
+import pycocotools.mask as maskUtils
+from scipy import ndimage
+import torch
+from tqdm import tqdm
+
+from mmdet.visualization import DetLocalVisualizer
+
+
+palette = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230), (106, 0, 228),
+         (0, 60, 100), (0, 80, 100), (0, 0, 70), (0, 0, 192), (250, 170, 30),
+         (100, 170, 30), (220, 220, 0), (175, 116, 175), (250, 0, 30),
+         (165, 42, 42), (255, 77, 255), (0, 226, 252), (182, 182, 255),
+         (0, 82, 0), (120, 166, 157), (110, 76, 0), (174, 57, 255),
+         (199, 100, 0), (72, 0, 118), (255, 179, 240), (0, 125, 92),
+         (209, 0, 151), (188, 208, 182), (0, 220, 176), (255, 99, 164),
+         (92, 0, 73), (133, 129, 255), (78, 180, 255), (0, 228, 0),
+         (134, 134, 103), (174, 255, 243), (45, 89, 255), (145, 148, 174),
+         (255, 208, 186)]
+
+
+def process_teeth(
+    teeth,
+    thresholds: list[float]=[0.0891, 0.3153, 0.4204, 0.1642, 0.1862, 0.0360, 0.0951],
+):
+    multi_masks = []
+    for rles in teeth['masks']:
+        multi_mask = 0
+        for i, rle in enumerate(rles, 1):
+            multi_mask += i * maskUtils.decode(rle)
+
+        multi_masks.append(multi_mask)
+
+    if 'multilogits' in teeth:
+        multi_scores = teeth['multilogits'][:, 1:]
+    else:
+        multi_scores = torch.ones(teeth['labels'].shape[0], 7)
+
+    if 'scores' in teeth:
+        keep = teeth['scores'] >= 0.3
+        teeth['labels'] = teeth['labels'][keep]
+        multi_scores = multi_scores[keep]
+        multi_masks = [multi_masks[i] for i in torch.nonzero(keep)[:, 0]]
+
+    labels, bboxes, masks = [], [], []
+    for tooth_label, multi_mask, multi_score in zip(teeth['labels'], multi_masks, multi_scores):
+        tooth_mask = (multi_mask > 0) & (multi_mask < 8)
+        tooth_mask = multi_mask == 1
+        tooth_bbox = maskUtils.toBbox(maskUtils.encode(np.asfortranarray(tooth_mask)))
+
+        for i, thr in enumerate(thresholds):
+            mask = multi_mask == (i + 2)
+            if mask.sum() == 0:
+                continue
+
+            if multi_score[i] < thr:
+                if i != 6:
+                    tooth_mask[mask] = True
+                continue
+
+
+            label_map, max_label = ndimage.label(mask)
+            for label in range(1, max_label + 1):
+                component_mask = label_map == label
+
+                if component_mask.sum() < 10:
+                    continue
+
+                bbox = maskUtils.toBbox(maskUtils.encode(np.asfortranarray(component_mask)))
+
+                labels.append(32 + i)
+                bboxes.append([
+                    bbox[0],
+                    bbox[1],
+                    bbox[0] + bbox[2],
+                    bbox[1] + bbox[3],
+                ])
+                masks.append(component_mask)
+            
+
+        labels.append(tooth_label.item())
+        bboxes.append([
+            tooth_bbox[0],
+            tooth_bbox[1],
+            tooth_bbox[0] + tooth_bbox[2],
+            tooth_bbox[1] + tooth_bbox[3],
+        ])
+        masks.append(tooth_mask)
+
+    out = {
+        'labels': torch.tensor(labels),
+        'bboxes': torch.tensor(bboxes),
+        'masks': [maskUtils.encode(np.asfortranarray(mask)) for mask in masks],
+    }
+    
+    return out
+
+
+def filter_teeth(instances: dict, thresholds: list[float]):
+    labels = instances['labels']
+    bboxes = instances['bboxes']
+    pred_scores = instances['scores'] if 'scores' in instances else torch.ones_like(instances['labels'])
+    rles = instances['masks']
+
+    tooth_labels = labels[labels < 32]
+    tooth_bboxes = bboxes[labels < 32]
+    tooth_rles = [rles[i] for i in torch.nonzero(labels < 32)[:, 0]]
+    tooth_areas = np.array([maskUtils.area(rle) for rle in tooth_rles])
+    
+    finding_bboxes = bboxes[labels >= 32]
+    finding_rles = [rles[i] for i in torch.nonzero(labels >= 32)[:, 0]]
+    finding_areas = np.array([maskUtils.area(rle) for rle in finding_rles])
+    finding_scores = pred_scores[labels >= 32]
+
+    # make calculus intersect with corresponding tooth
+    finding_labels = labels[labels >= 32]
+    finding_masks = [maskUtils.decode(rle) for rle in finding_rles]
+    finding_roll_masks = [
+        np.roll(mask, -50 + 100 * (label == 38), axis=1) if label >= 38 else mask
+        for mask, label in zip(finding_masks, finding_labels)
+    ]
+    finding_roll_rles = [maskUtils.encode(np.asfortranarray(mask)) for mask in finding_roll_masks]
+    finding_labels = torch.clip(finding_labels - 32, 0, 6)
+
+    # determine the matched teeth and tooth findings
+    ious = maskUtils.iou(tooth_rles, finding_roll_rles, [0]*len(finding_rles))
+    overlaps = ious / (finding_areas / tooth_areas[:, None])
+    for i, overlap_scores in enumerate(overlaps):
+        if not np.any(overlap_scores >= 0.5):
+            continue
+
+        tooth_mask = maskUtils.decode(tooth_rles[i])
+        finding_idxs = np.nonzero(overlap_scores >= 0.5)[0]
+        for idx in finding_idxs:
+            if finding_scores[idx] < thresholds[finding_labels[idx]]:
+                continue
+            # if finding_scores[idx] < 0.3:
+            #     continue
+
+            tooth_mask[finding_masks[idx] == 1] = 0
+
+        tooth_rles[i] = maskUtils.encode(np.asfortranarray(tooth_mask))
+
+    tooth_keep = pred_scores[labels < 32] >= 0.3
+    finding_keep = finding_scores >= thresholds[finding_labels]
+    # finding_keep = finding_scores >= 0.3
+    instances['labels'] = torch.cat((tooth_labels[tooth_keep], 32 + finding_labels[finding_keep]))
+    instances['bboxes'] = torch.cat((tooth_bboxes[tooth_keep], finding_bboxes[finding_keep]))
+    instances['masks'] = (
+        [tooth_rles[i] for i in torch.nonzero(tooth_keep)[:, 0]]
+        + [finding_rles[i] for i in torch.nonzero(finding_keep)[:, 0]]
+    )
+
+    return instances
+
+
+def process_instances(visualizer, image, instances):
+    masks = np.stack([maskUtils.decode(rle) for rle in instances['masks']])
+
+    idxs = np.argsort(instances['labels'])
+    out = InstanceData()
+    out['labels'] = instances['labels'][idxs]
+    out['bboxes'] = instances['bboxes'][idxs]
+    out['masks'] = torch.from_numpy(masks)[idxs]
+
+    image = visualizer._draw_instances(
+        image=image,
+        instances=out,
+        classes=[
+            '11', '12', '13', '14', '15', '16', '17', '18',
+            '21', '22', '23', '24', '25', '26', '27', '28',
+            '31', '32', '33', '34', '35', '36', '37', '38',
+            '41', '42', '43', '44', '45', '46', '47', '48',
+            'implants', 'crowns', 'pontic', 'fillings', 'roots', 'caries', 'calculus', 'calculus',
+        ],
+        palette=palette,
+    )
+
+    return image
+
+
+def save_hierarchical(work_dir: Path, filter_names: Optional[list[str]]):
+    with open(work_dir / 'detection.pkl', 'rb') as f:
+        results = pickle.load(f)
+
+    visualizer = DetLocalVisualizer(alpha=0.75)
+
+    img_paths, empties, anns, outs = [], [], [], []
+    for result in tqdm(results):
+        img_path = Path(result['img_path']).name
+        if filter_names is not None and img_path not in filter_names:
+            continue
+
+        image = cv2.imread(str(result['img_path']))
+        gt_instances = process_teeth(result['gt_instances'])
+        pred_instances = process_teeth(result['pred_instances'])
+
+        gt_image = process_instances(visualizer, image, gt_instances)
+        pred_image = process_instances(visualizer, image, pred_instances)
+
+        img_paths.append(img_path)
+        empties.append(image[..., ::-1])
+        anns.append(gt_image[..., ::-1])
+        outs.append(pred_image[..., ::-1])
+
+    return img_paths, (empties, anns, outs)
+
+
+def save_flat(
+    work_dir: Path,
+    filter_names: Optional[list[str]],
+    thresholds: list[float],
+):
+    with open(work_dir / 'detections.pkl', 'rb') as f:
+        results = pickle.load(f)
+
+    visualizer = DetLocalVisualizer(alpha=0.75)
+
+    outs = []
+    for result in tqdm(results):
+        img_path = Path(result['img_path'])
+        if filter_names is not None and img_path.name not in filter_names:
+            continue
+
+        image = cv2.imread(img_path.as_posix())
+        instances = filter_teeth(result['pred_instances'], thresholds)
+        pred_image = process_instances(visualizer, image, instances)
+
+        outs.append(pred_image[..., ::-1])
+
+    return outs
+
+
+if __name__ == '__main__':
+    df = pd.read_csv('lingyun/bad_examples.csv')
+
+    img_paths, top_rows = save_hierarchical(
+        Path('work_dirs/lingyun_trainval_hierarchical'),
+        # filter_names=None,
+        filter_names=df['name'].to_list(),
+    )
+    pred_images = []
+    for work_dir, thresholds in zip(
+        [
+            Path('work_dirs/lingyun_trainval_maskrcnn'),
+            Path('work_dirs/lingyun_trainval_maskdino'),
+            Path('work_dirs/lingyun_trainval_sparseinst'),
+        ],
+        [
+            torch.tensor([0.0350, 0.9920, 0.0791, 0.4384, 0.5576, 0.0601, 0.2432]),
+            torch.tensor([0.1411, 0.7918, 0.1251, 0.1151, 0.2673, 0.0761, 0.1261]),
+            torch.tensor([0.4044, 0.5295, 0.5936, 0.3403, 0.3433, 0.2573, 0.2853]),
+        ],
+    ):
+        pred_image = save_flat(
+            work_dir,
+            # filter_names=None,
+            filter_names=df['name'].to_list(),
+            thresholds=thresholds,
+        )
+        pred_images.append(pred_image)
+
+    for i, empty, ann, out, pred1, pred2, pred3 in zip(range(len(img_paths)), *top_rows, *pred_images):
+        if not np.isnan(df['x1'][i]):
+            slice_x = slice(int(df['x1'][i]), int(df['x2'][i]))
+            slice_y = slice(int(df['y1'][i]), int(df['y2'][i]))
+
+            empty = empty[slice_y, slice_x]
+            ann = ann[slice_y, slice_x]
+            out = out[slice_y, slice_x]
+            pred1 = pred1[slice_y, slice_x]
+            pred2 = pred2[slice_y, slice_x]
+            pred3 = pred3[slice_y, slice_x]
+
+        top_row = np.concatenate((empty, ann, out), axis=1)
+        bottom_row = np.concatenate((pred1, pred2, pred3), axis=1)
+        out_img = np.concatenate((top_row, bottom_row), axis=0)
+
+        plt.imshow(ann)
+        plt.title(img_paths[i])
+        plt.show()
+
+        print(img_paths[i])
+        cv2.imwrite(str(Path('side_by_side/bad') / img_paths[i]), out_img)
+        cv2.imwrite(str(Path('side_by_side/bad') / f'empty_{i}.png'), empty)
+        cv2.imwrite(str(Path('side_by_side/bad') / f'anns_{i}.png'), ann)
+        cv2.imwrite(str(Path('side_by_side/bad') / f'hierarchical_{i}.png'), out)
+        # cv2.imwrite(str(Path('side_by_side') / f'maskrcnn_{i}.png'), pred1)
+        # cv2.imwrite(str(Path('side_by_side') / f'maskdino_{i}.png'), pred2)
+        # cv2.imwrite(str(Path('side_by_side') / f'sparseinst_{i}.png'), pred3)
