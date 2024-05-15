@@ -1,12 +1,9 @@
 from pathlib import Path
 import pickle
-from typing import Optional
 
 import cv2
-import matplotlib.pyplot as plt
 from mmengine.structures import InstanceData
 import numpy as np
-import pandas as pd
 import pycocotools.mask as maskUtils
 from scipy import ndimage
 import torch
@@ -110,6 +107,11 @@ def filter_teeth(instances: dict, thresholds: list[float]):
     pred_scores = instances['scores'] if 'scores' in instances else torch.ones_like(instances['labels'])
     rles = instances['masks']
 
+    if torch.all(bboxes == 0):
+        bboxes = torch.tensor([maskUtils.toBbox(rle).tolist() for rle in rles])
+        bboxes[:, 2:] = bboxes[:, :2] + bboxes[:, 2:]
+
+
     tooth_labels = labels[labels < 32]
     tooth_bboxes = bboxes[labels < 32]
     tooth_rles = [rles[i] for i in torch.nonzero(labels < 32)[:, 0]]
@@ -187,17 +189,18 @@ def process_instances(visualizer, image, instances):
     return image
 
 
-def save_hierarchical(work_dir: Path, filter_names: Optional[list[str]]):
-    with open(work_dir / 'detection.pkl', 'rb') as f:
+def save_hierarchical(work_dir: Path, num_images: int):
+    with open(work_dir / 'detections.pkl', 'rb') as f:
         results = pickle.load(f)
+
+    file_names = [r['img_path'] for r in results]
+    results = [results[idx] for idx in np.argsort(file_names)]
 
     visualizer = DetLocalVisualizer(alpha=0.75)
 
     img_paths, empties, anns, outs = [], [], [], []
-    for result in tqdm(results):
+    for result in tqdm(results[:num_images]):
         img_path = Path(result['img_path']).name
-        if filter_names is not None and img_path not in filter_names:
-            continue
 
         image = cv2.imread(str(result['img_path']))
         gt_instances = process_teeth(result['gt_instances'])
@@ -216,20 +219,20 @@ def save_hierarchical(work_dir: Path, filter_names: Optional[list[str]]):
 
 def save_flat(
     work_dir: Path,
-    filter_names: Optional[list[str]],
     thresholds: list[float],
+    num_images: int,
 ):
     with open(work_dir / 'detections.pkl', 'rb') as f:
         results = pickle.load(f)
+        
+    file_names = [r['img_path'] for r in results]
+    results = [results[idx] for idx in np.argsort(file_names)]
 
     visualizer = DetLocalVisualizer(alpha=0.75)
 
     outs = []
-    for result in tqdm(results):
+    for result in tqdm(results[:num_images]):
         img_path = Path(result['img_path'])
-        if filter_names is not None and img_path.name not in filter_names:
-            continue
-
         image = cv2.imread(img_path.as_posix())
         instances = filter_teeth(result['pred_instances'], thresholds)
         pred_image = process_instances(visualizer, image, instances)
@@ -240,19 +243,21 @@ def save_flat(
 
 
 if __name__ == '__main__':
-    df = pd.read_csv('lingyun/bad_examples.csv')
+    out_dir = Path('side_by_side')
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    num_images = 10
 
     img_paths, top_rows = save_hierarchical(
-        Path('work_dirs/lingyun_trainval_hierarchical'),
-        # filter_names=None,
-        filter_names=df['name'].to_list(),
+        Path('work_dirs/chart_filing_hierarchical'),
+        num_images=num_images,
     )
     pred_images = []
     for work_dir, thresholds in zip(
         [
-            Path('work_dirs/lingyun_trainval_maskrcnn'),
-            Path('work_dirs/lingyun_trainval_maskdino'),
-            Path('work_dirs/lingyun_trainval_sparseinst'),
+            Path('work_dirs/chart_filing_maskrcnn'),
+            Path('work_dirs/chart_filing_maskdino'),
+            Path('work_dirs/chart_filing_sparseinst'),
         ],
         [
             torch.tensor([0.0350, 0.9920, 0.0791, 0.4384, 0.5576, 0.0601, 0.2432]),
@@ -262,37 +267,15 @@ if __name__ == '__main__':
     ):
         pred_image = save_flat(
             work_dir,
-            # filter_names=None,
-            filter_names=df['name'].to_list(),
             thresholds=thresholds,
+            num_images=num_images,
         )
         pred_images.append(pred_image)
 
     for i, empty, ann, out, pred1, pred2, pred3 in zip(range(len(img_paths)), *top_rows, *pred_images):
-        if not np.isnan(df['x1'][i]):
-            slice_x = slice(int(df['x1'][i]), int(df['x2'][i]))
-            slice_y = slice(int(df['y1'][i]), int(df['y2'][i]))
-
-            empty = empty[slice_y, slice_x]
-            ann = ann[slice_y, slice_x]
-            out = out[slice_y, slice_x]
-            pred1 = pred1[slice_y, slice_x]
-            pred2 = pred2[slice_y, slice_x]
-            pred3 = pred3[slice_y, slice_x]
-
         top_row = np.concatenate((empty, ann, out), axis=1)
         bottom_row = np.concatenate((pred1, pred2, pred3), axis=1)
-        out_img = np.concatenate((top_row, bottom_row), axis=0)
-
-        plt.imshow(ann)
-        plt.title(img_paths[i])
-        plt.show()
+        out_img = np.concatenate((top_row[:, :bottom_row.shape[1]], bottom_row[:, :top_row.shape[1]]), axis=0)
 
         print(img_paths[i])
-        cv2.imwrite(str(Path('side_by_side/bad') / img_paths[i]), out_img)
-        cv2.imwrite(str(Path('side_by_side/bad') / f'empty_{i}.png'), empty)
-        cv2.imwrite(str(Path('side_by_side/bad') / f'anns_{i}.png'), ann)
-        cv2.imwrite(str(Path('side_by_side/bad') / f'hierarchical_{i}.png'), out)
-        # cv2.imwrite(str(Path('side_by_side') / f'maskrcnn_{i}.png'), pred1)
-        # cv2.imwrite(str(Path('side_by_side') / f'maskdino_{i}.png'), pred2)
-        # cv2.imwrite(str(Path('side_by_side') / f'sparseinst_{i}.png'), pred3)
+        cv2.imwrite(str(out_dir / img_paths[i]), out_img)

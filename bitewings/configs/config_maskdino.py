@@ -2,10 +2,8 @@ _base_ = './config_maskrcnn.py'
 
 custom_imports = dict(
     imports=[
-        'lingyun.data',
-        'lingyun.synmedico.binary_metric',
-        'lingyun.synmedico.det_tta',
-        'lingyun.evaluation.coco_metric',
+        'bitewings.evaluation.metrics',
+        'bitewings.models',
         'projects.DENTEX.datasets',
         'projects.DENTEX.evaluation',
         'projects.MaskDINO.maskdino',
@@ -13,7 +11,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-work_dir = 'work_dirs/lingyun_trainval_maskdino/'
+work_dir = 'work_dirs/chart_filing_maskdino/'
 
 model = dict(
     _delete_=True,

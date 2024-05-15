@@ -22,7 +22,6 @@ custom_imports = dict(
 root = '../data/Netherlands/'
 fold = 1
 work_dir = 'work_dirs/chart_filing_hierarchical/'
-phase = 'train'
 merge_layers = True
 share_mlp = True
 
@@ -173,7 +172,7 @@ test_evaluator = [
     dict(
         type='DumpMulticlassDetResults',
         score_thr=0.0,
-        out_file_path=work_dir + 'detection.pkl',
+        out_file_path=work_dir + 'detections.pkl',
     ),
 ]
 
@@ -193,7 +192,7 @@ model = dict(
             enable_multilabel=not merge_layers,
             enable_multiclass=True,
             share_mlp=share_mlp,
-            num_queries=80 if phase == 'train' else 100,
+            num_queries=80,
         ),
     ),
     panoptic_fusion_head=dict(

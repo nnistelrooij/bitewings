@@ -1,3 +1,8 @@
-fvcore
+fvcore==0.1.5.post20221221
 scikit-multilearn @ git+https://github.com/scikit-multilearn/scikit-multilearn.git#egg=scikit-multilearn
 seaborn==0.13.2
+SimpleITK==2.3.1
+tensorboard==2.16.2
+-f https://data.pyg.org/whl/torch-2.0.1+cu118.html
+torch-scatter
+yapf==0.40.1

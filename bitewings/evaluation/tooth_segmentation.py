@@ -15,7 +15,7 @@ def evaluate_hierarchical(
     min_width: float=0.1,
     iou_thr: float=0.75,
 ):
-    with open(work_dir / 'detection.pkl', 'rb') as f:
+    with open(work_dir / 'detections.pkl', 'rb') as f:
         results = pickle.load(f)
 
     n, fn, tp, fp = defaultdict(int), defaultdict(int), defaultdict(int), defaultdict(int)
@@ -85,10 +85,6 @@ def evaluate_hierarchical(
             fp[tooth_type] += (matches.sum(0) == 0).sum()
 
     for key in sorted(n):
-        print()
-        print(key)
-        print('n', n[key])
-
         if key not in tp:
             continue
 
@@ -96,6 +92,9 @@ def evaluate_hierarchical(
         sens = tp[key] / (tp[key] + fn[key])
         f1 = 2 * tp[key] / (2 * tp[key] + fp[key] + fn[key])
 
+        print()
+        print(key)
+        print('n', n[key])
         print('Precision', prec)
         print('Sensitivity', sens)
         print('F1-score', f1)
@@ -182,10 +181,6 @@ def evaluate_flat(
             fp[tooth_type] += (matches.sum(0) == 0).sum()
 
     for key in sorted(n):
-        print()
-        print(key)
-        print('n', n[key])
-
         if key not in tp:
             continue
 
@@ -193,13 +188,16 @@ def evaluate_flat(
         sens = tp[key] / (tp[key] + fn[key])
         f1 = 2 * tp[key] / (2 * tp[key] + fp[key] + fn[key])
 
+        print()
+        print(key)
+        print('n', n[key])
         print('Precision', prec)
         print('Sensitivity', sens)
         print('F1-score', f1)
 
 
 if __name__ == '__main__':
-    evaluate_hierarchical(Path('work_dirs/lingyun_trainval_hierarchical'))
-    # evaluate_flat(Path('work_dirs/lingyun_trainval_maskrcnn'))
-    evaluate_flat(Path('work_dirs/lingyun_trainval_maskdino'))
-    # evaluate_flat(Path('work_dirs/lingyun_trainval_sparseinst'))
+    evaluate_hierarchical(Path('work_dirs/chart_filing_hierarchical'))
+    evaluate_flat(Path('work_dirs/chart_filing_maskrcnn'))
+    evaluate_flat(Path('work_dirs/chart_filing_maskdino'))
+    evaluate_flat(Path('work_dirs/chart_filing_sparseinst'))

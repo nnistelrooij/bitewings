@@ -94,7 +94,10 @@ def compute_metrics(gts, scores):
 
     cms = []
     for i in range(gts.shape[1]):
-        cm = confusion_matrix(gts[:, i], preds[:, i])
+        if gts[:, i].sum() == 0:
+            cm = np.array([[gts.shape[0], 0], [0, 0]])
+        else:
+            cm = confusion_matrix(gts[:, i], preds[:, i])
         cms.append(cm)
 
     return np.stack(cms)
@@ -129,7 +132,7 @@ def evaluate_hierarchical(
     work_dir: Path,
     iou_thr: float=0.75,
 ):
-    with open(work_dir / 'detection.pkl', 'rb') as f:
+    with open(work_dir / 'detections.pkl', 'rb') as f:
         results = pickle.load(f)
 
     gt_idxs_list, gts, scores = [], [], []
@@ -226,7 +229,7 @@ def evaluate_flat(
     score_thr: float=0.5,
     iou_thr: float=0.75,
 ):
-    with open(hierarchical_work_dir / 'detection.pkl', 'rb') as f:
+    with open(hierarchical_work_dir / 'detections.pkl', 'rb') as f:
         hierarchical_results = pickle.load(f)
 
     with open(work_dir / 'detections.pkl', 'rb') as f:
@@ -266,16 +269,16 @@ def evaluate_model(work_dir: Path):
     if 'hierarchical' in work_dir.name:
         return evaluate_hierarchical(work_dir)
     else:
-        return evaluate_flat(Path('work_dirs/lingyun_trainval_hierarchical'), work_dir)
+        return evaluate_flat(Path('work_dirs/chart_filing_hierarchical'), work_dir)
     
 
 
 def compute_gts_scores():
     work_dirs = [
-        Path('work_dirs/lingyun_trainval_sparseinst'),
-        Path('work_dirs/lingyun_trainval_maskrcnn'),
-        Path('work_dirs/lingyun_trainval_maskdino'),
-        Path('work_dirs/lingyun_trainval_hierarchical'),
+        Path('work_dirs/chart_filing_sparseinst'),
+        Path('work_dirs/chart_filing_maskrcnn'),
+        Path('work_dirs/chart_filing_maskdino'),
+        Path('work_dirs/chart_filing_hierarchical'),
     ]
     gt_idxs, gts, scores = [], [], []
     for work_dir in work_dirs:
@@ -313,6 +316,8 @@ if __name__ == '__main__':
         *compute_gts_scores(),
     ):
         for i, label in enumerate(classes):
+            if gt[:, i].sum() <= 1:
+                continue
             roc = roc_curve(gt[:, i], score[:, i])
             auc = roc_auc_score(gt[:, i], score[:, i])
             axs_roc[i].set_title(label)

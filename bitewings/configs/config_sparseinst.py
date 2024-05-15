@@ -11,7 +11,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-work_dir = f'work_dirs/lingyun_trainval_sparseinst/'
+work_dir = 'work_dirs/chart_filing_sparseinst/'
 
 model = dict(
     _delete_=True,

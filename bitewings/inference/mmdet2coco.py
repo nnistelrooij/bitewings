@@ -194,7 +194,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    root = Path(f'work_dirs/lingyun_trainval_{args.method}')
+    root = Path(f'work_dirs/chart_filing_{args.method}')
     classes = [
         'tooth', 'implants', 'crowns', 'pontic', 'fillings', 'roots', 'caries', 'calculus',
     ]
@@ -206,5 +206,5 @@ if __name__ == '__main__':
     ]
     classes = [f'{label}_{fdi}' for label in classes for fdi in fdis]
     ensemble_detections(
-        root, name='detection', classes=classes,
+        root, name='detections', classes=classes,
     )

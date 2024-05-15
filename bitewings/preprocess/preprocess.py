@@ -31,8 +31,11 @@ if __name__ == '__main__':
     with open(root / 'annotations_fdi.json', 'w') as f:
         json.dump(coco.dataset, f, indent=2)
 
+    # split images with stratification for k-fold cross-validation
+    coco = COCO(root / 'annotations_fdi.json')
+    split(root, coco, 'fdi', n_splits=5)
+
     # go back to flat representation for comparative models
-    coco = COCO(root / 'annotations_fdi.json')    
     classes = [
         'tooth_11', 'tooth_12', 'tooth_13', 'tooth_14', 'tooth_15', 'tooth_16', 'tooth_17', 'tooth_18',
         'tooth_21', 'tooth_22', 'tooth_23', 'tooth_24', 'tooth_25', 'tooth_26', 'tooth_27', 'tooth_28',
@@ -40,21 +43,17 @@ if __name__ == '__main__':
         'tooth_41', 'tooth_42', 'tooth_43', 'tooth_44', 'tooth_45', 'tooth_46', 'tooth_47', 'tooth_48',
         'implants', 'crowns', 'pontic', 'fillings', 'roots', 'caries', 'calculus_left', 'calculus_right',
     ]
+    for coco_path in list((root / 'splits').glob('*')):
+        coco = COCO(coco_path)
 
-    out_dict = {
-        'images': coco.dataset['images'],
-        'categories': [{'id': i, 'name': label} for i, label in enumerate(classes, 1)],
-        'annotations': [],
-    }
-    for img_dict in tqdm(list(coco.imgs.values())):
-        out_dict = process_image(coco, img_dict, out_dict)
+        out_dict = {
+            'images': coco.dataset['images'],
+            'categories': [{'id': i, 'name': label} for i, label in enumerate(classes, 1)],
+            'annotations': [],
+        }
+        for img_dict in tqdm(list(coco.imgs.values())):
+            out_dict = process_image(coco, img_dict, out_dict)
 
-    with open(root / 'annotations_flat.json', 'w') as f:
-        json.dump(out_dict, f, indent=2)
-
-    # split images with stratification for k-fold cross-validation
-    coco = COCO(root / 'annotations_fdi.json')
-    split(root, coco, 'fdi', n_splits=5)
-
-    coco = COCO(root / 'annotations_flat.json')
-    split(root, coco, 'flat', n_splits=5)
+        out_path = f'{coco_path.stem.replace("fdi", "flat")}.json'
+        with open(root / 'splits' / out_path, 'w') as f:
+            json.dump(out_dict, f, indent=2)

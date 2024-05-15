@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import shutil
 from typing import List, Optional
 
 import numpy as np
@@ -131,6 +132,7 @@ def split(
     one_hots = determine_one_hots(coco, files)
 
     out_dir = root / 'splits'
+    shutil.rmtree(root / 'splits', ignore_errors=True)
     out_dir.mkdir(exist_ok=True)
 
     if test_path is not None:

@@ -55,5 +55,5 @@ if __name__ == '__main__':
 
     main(
         args.in_dir,
-        Path(f'work_dirs/lingyun_trainval_{args.method}/pred.json'),
+        Path(f'work_dirs/chart_filing_{args.method}/pred.json'),
     )

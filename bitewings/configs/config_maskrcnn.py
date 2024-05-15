@@ -19,11 +19,9 @@ classes = [
 ]
 
 
-synmedico_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_train/'
-nijmegen_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_test/'
-ai_dental_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_extra/'
-work_dir = f'work_dirs/lingyun_trainval_maskrcnn/'
-
+root = '../data/Netherlands/'
+fold = 1
+work_dir = 'work_dirs/chart_filing_maskrcnn/'
 filter_empty = False
 
 train_pipeline = [
@@ -76,28 +74,16 @@ train_dataloader = dict(
         type='InstanceBalancedDataset',
         oversample_thr=0.1,
         key='bbox_label',
-        dataset=dict(type='ConcatDataset', datasets=[
-            dict(
-                type='CocoDataset',
-                filter_cfg=dict(filter_empty_gt=filter_empty),
-                serialize_data=False,
-                pipeline=train_pipeline,
-                ann_file=synmedico_root + f'coco_flat.json',
-                data_prefix=dict(img=synmedico_root + 'images'),
-                data_root=synmedico_root,
-                metainfo=dict(classes=classes),
-            ),
-            dict(
-                type='CocoDataset',
-                filter_cfg=dict(filter_empty_gt=filter_empty),
-                serialize_data=False,
-                pipeline=train_pipeline,
-                ann_file=nijmegen_root + f'coco_flat.json',
-                data_prefix=dict(img=nijmegen_root + 'images'),
-                data_root=nijmegen_root,
-                metainfo=dict(classes=classes),
-            )
-        ]),
+        dataset=dict(
+            type='CocoDataset',
+            filter_cfg=dict(filter_empty_gt=filter_empty),
+            serialize_data=False,
+            pipeline=train_pipeline,
+            ann_file=f'splits/train_flat_{fold}.json',
+            data_prefix=dict(img='images'),
+            data_root=root,
+            metainfo=dict(classes=classes),
+        ),
     ),
 )
 
@@ -121,10 +107,9 @@ val_dataloader = dict(
         type='CocoDataset',
         pipeline=val_pipeline,
         metainfo=dict(classes=classes),
-        # ann_file=ai_dental_root + f'val_ai-dental_1.json',
-        ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/coco_flat.json',
-        data_prefix=dict(img=ai_dental_root + 'images'),
-        data_root=ai_dental_root,
+        ann_file=f'splits/val_flat_{fold}.json',
+        data_prefix=dict(img='images'),
+        data_root=root,
     ),
 )
 val_evaluator = [
@@ -132,8 +117,7 @@ val_evaluator = [
         type='CocoMetric',
         classwise=True,
         metric=['bbox', 'segm'],
-        # ann_file=ai_dental_root + f'val_ai-dental_1.json',
-        # ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/coco_flat.json',
+        ann_file=root + f'splits/val_flat_{fold}.json',
     ),
     dict(
         type='AggregateLabelInstanceMetric',
@@ -148,24 +132,19 @@ test_dataloader = dict(
     dataset=dict(
         type='CocoDataset',
         pipeline=val_pipeline,
-        # ann_file=ai_dental_root + f'coco_flat.json',
-        ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/coco_flat.json',
-        data_prefix=dict(img=ai_dental_root + 'images'),
-        data_root=ai_dental_root,
+        ann_file=f'splits/val_flat_{fold}.json',
+        data_prefix=dict(img='images'),
+        data_root=root,
         metainfo=dict(classes=classes),
     ),
 )
-# test_evaluator = dict(
-#     _delete_=True,
-#     type='DumpGTPredDetResults',
-# )
+
 test_evaluator = [
     dict(
         type='RelevantCocoMetric',
         classwise=True,
         metric=['bbox', 'segm'],
-        # ann_file=ai_dental_root + f'coco_flat.json',
-        # ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/coco_flat.json',
+        ann_file=root + f'splits/val_flat_{fold}.json',
     ),
     dict(
         type='AggregateLabelInstanceMetric',
@@ -205,7 +184,7 @@ model = dict(
 )
 load_from = '../checkpoints/maskrcnn_odonto.pth'
 
-max_epochs = 50
+max_epochs = 36
 train_cfg = dict(
     _delete_=True,
     type='EpochBasedTrainLoop',
@@ -218,7 +197,7 @@ param_scheduler = dict(
     begin=0,
     end=max_epochs,
     by_epoch=True,
-    milestones=[40, 48],
+    milestones=[27, 33],
     gamma=0.1,
 )
 

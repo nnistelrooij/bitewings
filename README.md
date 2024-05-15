@@ -31,16 +31,16 @@ PYTHONPATH=. python \
     test_dataloader.dataset.ann_file=$IN_DIR/coco.json
 ```
 
-The predictions can be converted to COCO by running `bitewings/inference/mmdet2coco.py`. Afterward, the annotations can be visualized by running `bitewings/inference/show_anns.py`. One example bitewing has been added in the `test/` folder with which you can run the models and show the prediction results.
+choosing the input directory for `<path>` and a model architecture for `<model>`. The predictions can be converted to COCO by running `bitewings/inference/mmdet2coco.py`. Afterward, the annotations can be visualized by running `bitewings/inference/show_anns.py` or `bitewings/visualization/side_by_side.py`. One example bitewing has been added in the `test/` folder with which you can run the models and show the prediction results.
 
 
-## OdontoAI pretraining
+## OdontoAI pre-training
 
 If you would like to skip this step, model checkpoints pre-trained on COCO and OdontoAI are made available on request.
 
 **Preprocessing** Unzip the downloaded data from the OdontoAI platform to the `../data/` folder and run `bitewings/odonto/preprocess.py` to combine the train and validation images and to split the data.
 
-**Training** Following the preprocessing, the Mask DINO, Mask R-CNN, and SparseInst models can be pretrained by running the following command:
+**Training** Following the preprocessing, the Mask DINO, Mask R-CNN, and SparseInst models can be pre-trained by running the following command:
 
 ```bash
 PYTHONPATH=. python mmdetection/tools/train.py bitewings/odonto/config_<model>.py
@@ -60,26 +60,26 @@ Furthermore, `bitewings/preprocess/intensities.py` and `bitewings/preprocess/pre
 
 ### Training
 
-After pretraining a model on the OdontoAI dataset, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_odonto.pth`, after which it can be fine-tuned on the bitewings from The Netherlands using the following command:
+After pre-training a model on the OdontoAI dataset, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_odonto.pth`, after which it can be fine-tuned on the bitewings from The Netherlands using the following command:
 
 ```bash
 PYTHONPATH=. python mmdetection/tools/train.py bitewings/configs/config_<model>.py
 ```
 
-Please note that the hierarchical instance segmentation method requires at least 24GB of GPU memory and typically requires 20 GPU hours to complete training.
+choosing a model architecture for `<model>`. Please note that the hierarchical instance segmentation method requires at least 20 GPU hours to complete training.
 
 
 ### Evaluation
 
-A fine-tuned model can be evaluated on bitewings from Slovakia in an external validation using the following command:
+After fine-tuning a model on the data from The Netherlands, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_chartfiling.pth`. A fine-tuned model can be evaluated using the following command:
 
 ```bash
-PYTHONPATH=. python mmdetection/tools/test.py bitewings/configs/config_<model>.py work_dirs/lingyun_trainval_<model>/epoch_36.pth
+PYTHONPATH=. python mmdetection/tools/test.py bitewings/configs/config_<model>.py ../checkpoints/<model>_chartfiling.pth
 ```
 
-This will produce mean average precision (mAP) metrics for tooth segmentation and labeling and the results will be written to a pickel file in the working directory.
+choosing a model architecture for `<model>`. This will produce mean average precision (mAP) metrics for tooth segmentation and labeling and the results will be written to a pickle file in the working directory.
 
-Further metrics for tooth segmentation and labeling can be computed by running `bitewings/evaluation/tooth_segmentation.py`. Furthermore, metrics can be computed for tooth finding classification by running `bitewings/evaluation/tooth_findings.py`. Lastly, figures showing the original bitewing, the bitewing with annotations and the bitewing with model predictions can be visualized by running `bitewings/visualization/side_by_side.py`.
+Further metrics for tooth segmentation and labeling can be computed by running `bitewings/evaluation/tooth_segmentation.py`. Furthermore, metrics can be computed for tooth finding classification by running `bitewings/evaluation/tooth_findings.py`. Lastly, figures showing the original bitewing, the bitewing with annotations, and the bitewing with model predictions can be visualized by running `bitewings/visualization/side_by_side.py`.
 
 
 ## Citation
