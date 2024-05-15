@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import numpy as np
 from pycocotools.coco import COCO
-from skmultilearn.model_selection import IterativeStratification
+from skmultilearn.model_selection.iterative_stratification import IterativeStratification
 from tqdm import tqdm
 
 
@@ -50,7 +50,7 @@ def determine_one_hots(
     for file in tqdm(files):
         file_cats = []
         for ann in coco.imgToAnns[filename2id[file]]:
-            cat_name = coco.cats[ann['category_id']]['name']
+            cat_name = coco.cats[ann['category_id']]['name'].lower()
             cat_name = cat_name[:-3] if cat_name[-1] in '12345678' else cat_name
             cats.add(cat_name)
             file_cats.append(cat_name)
@@ -67,11 +67,10 @@ def determine_one_hots(
 
 
 def test_split(
-    ann_dir: Path,
+    out_dir: Path,
     files: List[Path],
     one_hots: np.ndarray,
     test_path: Path,
-    name: str,
 ):
     coco = COCO(test_path)
     img_paths = set([img['file_name'] for img in coco.dataset['images']])
@@ -85,7 +84,7 @@ def test_split(
 
     _, test_coco = copy_annotations(coco, files, split)
 
-    with open(ann_dir / f'test_{name}.json', 'w') as f:
+    with open(out_dir / 'test.json', 'w') as f:
         json.dump(test_coco, f, indent=2)
 
     trainval_idxs = np.array(split[0])
@@ -93,8 +92,9 @@ def test_split(
 
 
 def kfold_split(
-    root: Path,
+    out_dir: Path,
     coco: COCO,
+    name: str,
     n_splits: int,
     files: List[Path],
     one_hots: np.ndarray,
@@ -105,51 +105,37 @@ def kfold_split(
         splitter = IterativeStratification(n_splits, order=2, shuffle=True, random_state=1234)
         splits += list(splitter.split(one_hots, one_hots))
 
-    out_dir = root / 'splits'
-    out_dir.mkdir(exist_ok=True)
-
     for i, split in enumerate(splits):
         if split is None:
-            with open(out_dir / f'trainval.json', 'w') as f:
+            with open(out_dir / f'trainval_{name}.json', 'w') as f:
                 json.dump(coco.dataset, f, indent=2)
             continue
 
         train_coco, val_coco = copy_annotations(coco, files, split)
 
-        with open(out_dir / f'train_{i}.json', 'w') as f:
+        with open(out_dir / f'train_{name}_{i}.json', 'w') as f:
             json.dump(train_coco, f, indent=2)
 
-        with open(out_dir / f'val_{i}.json', 'w') as f:
+        with open(out_dir / f'val_{name}_{i}.json', 'w') as f:
             json.dump(val_coco, f, indent=2) 
 
 
 def split(
     root: Path,
     coco: COCO,
+    name: str,
     n_splits: int,
     test_path: Optional[Path]=None,
-    name: str=''
 ):
     files = sorted([img['file_name'] for img in coco.dataset['images']])
     one_hots = determine_one_hots(coco, files)
 
+    out_dir = root / 'splits'
+    out_dir.mkdir(exist_ok=True)
+
     if test_path is not None:
         files, one_hots = test_split(
-            root, files, one_hots, test_path, name,
+            out_dir, files, one_hots, test_path,
         )
 
-    kfold_split(root, coco, n_splits, files, one_hots, name)
-
-
-if __name__ == '__main__':
-    for dataset in [
-        Path('data/Germany'),
-        Path('data/Netherlands'),
-        Path('data/Slovakia'),
-    ]:
-        coco = COCO(dataset / 'annotations_fdi.json')
-        split(
-            dataset,
-            coco,
-            n_splits=5,
-        )
+    kfold_split(out_dir, coco, name, n_splits, files, one_hots)

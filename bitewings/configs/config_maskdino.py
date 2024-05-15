@@ -117,7 +117,7 @@ model = dict(
             focus_on_box=False),            
         max_per_image=300),
     init_cfg=None)
-load_from = 'work_dirs/odonto_bitewings_enumeration/epoch_50.pth'
+load_from = '../checkpoints/maskdino_odonto.pth'
 
 embed_multi = dict(lr_mult=1.0, decay_mult=0.0)
 optim_wrapper = dict(

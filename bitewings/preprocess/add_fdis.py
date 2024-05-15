@@ -1,13 +1,15 @@
 import copy
 import json
+import logging
 from pathlib import Path
 import re
-import tempfile
 
 import numpy as np
 from pycocotools.coco import COCO
 import pycocotools.mask as maskUtils
 from scipy import ndimage
+
+from bitewings.preprocess.split_images import split
 
 
 def coco_to_rle(ann, h, w):
@@ -25,7 +27,7 @@ def coco_to_rle(ann, h, w):
     return ann
 
 
-def add_fdis(coco: COCO):
+def add_categories_with_fdi(coco: COCO):
     catids = set([cat['id'] for cat in coco.dataset['categories']])
     catnames = [cat['name'] for cat in coco.dataset['categories']]
     out_dict = copy.deepcopy(coco.dataset)
@@ -43,18 +45,23 @@ def add_fdis(coco: COCO):
                 while offset in catids:
                     offset += 1
 
-                out_dict['categories'].append({'id': offset, 'name': name})
+                out_dict['categories'].append({
+                    'id': offset,
+                    'name': name,
+                    'supercategory': 'root',
+                })
                 offset += 1
 
-    with tempfile.NamedTemporaryFile('w') as f:
+    tmp_path = Path('/tmp/out.json')
+    with open(tmp_path, 'w') as f:
         json.dump(out_dict, f)
-        f.flush()
-        coco = COCO(f.name)
+    coco = COCO(tmp_path)
+    Path(tmp_path).unlink()
 
     return coco
 
 
-def determine_tooth_annotations(coco, anns):
+def determine_tooth_matches(coco, anns):
     if not anns:
         return []
     
@@ -62,12 +69,14 @@ def determine_tooth_annotations(coco, anns):
     catid2name = {cat_id: cat['name'] for cat_id, cat in coco.cats.items()}
     catname2id = {cat['name']: cat_id for cat_id, cat in coco.cats.items()}
 
-    catnames = [catid2name[ann['category_id']] for ann in anns]
-    is_tooths = np.nonzero(['tooth' in cat.lower() for cat in catnames])[0]
+    catnames = [catid2name[ann['category_id']].lower() for ann in anns]
+    is_tooths = np.nonzero(['tooth' in cat for cat in catnames])[0]
     no_fdis = np.nonzero([re.match('\d+', cat.split('_')[-1]) is None for cat in catnames])[0]
 
     out_anns = [ann for i, ann in enumerate(anns) if i not in no_fdis]
     if no_fdis.shape[0] == 0:
+        for ann in out_anns:
+            ann['iscrowd'] = 0
         return out_anns
 
     rles = [coco_to_rle(ann['segmentation'], h, w) for ann in anns]
@@ -81,12 +90,14 @@ def determine_tooth_annotations(coco, anns):
     non_tooth_areas = np.array([anns[i]['area'] for i in no_fdis])
 
     optimal = non_tooth_areas[:, None] / tooth_areas[None]
-    ious = maskUtils.iou(non_tooth_rles, tooth_rles, np.zeros_like(is_tooths)) / optimal
+    ious = maskUtils.iou(non_tooth_rles, tooth_rles, np.zeros_like(is_tooths))
     match_scores = ious / optimal
     for i, non_tooth_match_scores in enumerate(match_scores):
         if not np.any(non_tooth_match_scores):
-            non_tooth_ann = anns[no_fdis[i]]
-            print(coco.imgs[non_tooth_ann['image_id']]['file_name'], coco.cats[non_tooth_ann['category_id']]['name'])
+            file_name = coco.imgs[anns[0]['image_id']]['file_name']
+            catname = catnames[no_fdis[i]]
+
+            logging.debug(' '.join(['No match:', file_name, catname]))
             continue
 
         tooth_ann = anns[is_tooths[non_tooth_match_scores.argmax()]]
@@ -102,22 +113,3 @@ def determine_tooth_annotations(coco, anns):
         ann['iscrowd'] = 0
 
     return out_anns
-
-
-if __name__ == '__main__':
-    for dataset in [
-        Path('data/Germany'),
-        Path('data/Netherlands'),
-        Path('data/Slovakia'),
-    ]:
-        coco = COCO(dataset / 'annotations.json')
-        coco = add_fdis(coco)
-
-        out_anns = []
-        for img_id in coco.imgs:
-            anns = determine_tooth_annotations(coco, coco.imgToAnns[img_id])
-            out_anns.extend(anns)
-
-        coco.dataset['annotations'] = out_anns
-        with open(dataset / 'annotations_fdi.json', 'w') as f:
-            json.dump(coco.dataset, f, indent=2)

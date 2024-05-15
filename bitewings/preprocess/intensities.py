@@ -9,14 +9,10 @@ from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    roots = [
-        Path('/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_train/images'),
-        Path('/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_test/images'),
-        Path('/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_extra/images')
-    ]
+    roots = {'Netherlands': Path('../data/Netherlands/images')}
 
     bins = np.zeros((len(roots), 256))
-    for i, root in enumerate(roots):
+    for i, root in enumerate(roots.values()):
         for img_path in tqdm(list(root.glob('*'))):
             img = cv2.imread(str(img_path))
 
@@ -36,11 +32,10 @@ if __name__ == '__main__':
 
     df = pd.DataFrame({
         'Intensity value': np.concatenate(numbers_list),
-        'Source': np.array(['Germany', 'Netherlands', 'Slovakia']).repeat([len(n) for n in numbers_list]),
+        'Source': np.array(list(roots.keys())).repeat([len(n) for n in numbers_list]),
     })
 
     sns.kdeplot(data=df, x='Intensity value', hue='Source', bw_adjust=1)
     plt.gca().get_yaxis().set_ticks([])
     plt.savefig('kdes.png', dpi=800, bbox_inches='tight', pad_inches=None)
     plt.show()
-

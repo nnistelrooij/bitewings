@@ -7,9 +7,13 @@ from typing import List
 import numpy as np
 from pycocotools.coco import COCO
 from sklearn.model_selection import KFold
+from tqdm import tqdm
 
 
-def combine_train_val(root: Path, out_dir: Path):
+def combine_train_val(
+    root: Path,
+    out_dir: Path,
+):
     (out_dir / 'images').mkdir(parents=True, exist_ok=True)
 
     out_dict = {
@@ -19,20 +23,27 @@ def combine_train_val(root: Path, out_dir: Path):
     }
     for split in ['train', 'val']:
         split_dir = root / split
-        for img_path in (split_dir / 'images').glob('*'):
-            shutil.copy(img_path, out_dir / 'images' / img_path.name)
+        coco = COCO(split_dir / f'{split}.json')
 
-        with open(split_dir / f'{split}.json', 'r') as f:
-            coco_dict = json.load(f)
+        out_dict['categories'] = coco.dataset['categories']
+        for img_id, img_dict in enumerate(coco.imgs.values(), len(out_dict['images']) + 1):
+            for ann_dict in coco.imgToAnns[img_dict['id']]:
+                ann_dict['image_id'] = img_id
 
-        out_dict['images'].extend(coco_dict['images'])
-        out_dict['annotations'].extend(coco_dict['annotations'])
-        out_dict['categories'] = coco_dict['categories']
+            rel_path = (split_dir / 'images' / img_dict['file_name']).relative_to(root)
+            img_dict['file_name'] = rel_path.as_posix()
+            img_dict['id'] = img_id
 
-    with open(out_dir / 'odonto.json', 'w') as f:
+            out_dict['images'].append(img_dict)
+            out_dict['annotations'].extend(coco.imgToAnns[img_dict['id']])
+
+    for ann_id, ann_dict in enumerate(out_dict['annotations'], 1):
+        ann_dict['id'] = ann_id    
+
+    with open(out_dir / 'bitewings.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
 
-    return out_dir / 'odonto.json'
+    return COCO(out_dir / 'bitewings.json')
 
 
 def is_bitewing_suitable(
@@ -56,7 +67,7 @@ def is_bitewing_suitable(
     return counts.min() >= 3
 
 
-def select_bitewings(coco: COCO, out_dir: Path):
+def select_bitewings(root: Path, coco: COCO, out_dir: Path):
     catid2name = {cat['id']: cat['name'] for cat in coco.cats.values()}
 
     coco_dict = {
@@ -64,18 +75,24 @@ def select_bitewings(coco: COCO, out_dir: Path):
         'annotations': [],
         'categories': coco.dataset['categories'],
     }
-    for i, img_id in enumerate(coco.imgs):        
+    for img_id, img_dict in coco.imgs.items():
         if not is_bitewing_suitable(coco, catid2name, img_id):
             continue
 
-        img_dict = copy.deepcopy(coco.imgs[img_id])
+        shutil.copy(
+            root / img_dict['file_name'],
+            out_dir / 'images' / img_dict['file_name'].split('/')[-1],
+        )
+
+        img_dict = copy.deepcopy(img_dict)
+        img_dict['file_name'] = img_dict['file_name'].split('/')[-1]
         coco_dict['images'].append(img_dict)
         coco_dict['annotations'].extend(coco.imgToAnns[img_id])
 
-    with open(out_dir / 'odonto_bitewings.json', 'w') as f:
+    with open(out_dir / 'bitewings.json', 'w') as f:
         json.dump(coco_dict, f, indent=2)
 
-    return out_dir / 'odonto_bitewings.json'
+    return COCO(out_dir / 'bitewings.json')
 
 
 def copy_annotations(
@@ -97,7 +114,6 @@ def copy_annotations(
 
     train_coco_dict = {
         'categories': coco.dataset['categories'],
-        'tag_categories': coco.dataset['tag_categories'],
     }
     val_coco_dict = copy.deepcopy(train_coco_dict)
 
@@ -117,34 +133,20 @@ def copy_annotations(
 def test_split(
     ann_dir: Path,
     files: List[Path],
-    tags: List[List[str]],
     test_size: float,
-    name: str,
-    keep_tags: List[str]=['Bitewing'],
 ):
-    keep_mask = np.ones(len(files), dtype=bool)
-    for i, file_tags in enumerate(tags):
-        if not np.all(np.any(np.array(file_tags)[None] == np.array(keep_tags)[:, None], axis=1)):
-            keep_mask[i] = False
-            continue
-
-    keep_files = [file for file, b in zip(files, keep_mask) if b]
-
     splitter = KFold(
         n_splits=int(1 / test_size),
         shuffle=True,
         random_state=1234,
     )
-    split = next(splitter.split(keep_files, keep_files))
-    _, test_coco = copy_annotations(coco, keep_files, split)
+    split = next(splitter.split(files, files))
+    _, test_coco = copy_annotations(coco, files, split)
 
-    with open(ann_dir / f'test_{name}.json', 'w') as f:
+    with open(ann_dir / 'test.json', 'w') as f:
         json.dump(test_coco, f, indent=2)
 
-    files = [
-        *[file for file, b in zip(files, keep_mask) if not b],
-        *[keep_files[idx] for idx in split[0]],
-    ]
+    files = [files[idx] for idx in split[0]]
 
     return files
 
@@ -154,7 +156,6 @@ def kfold_split(
     coco: COCO,
     n_splits: int,
     files: List[Path],
-    name: str,
 ):
     splits = [None]
     if n_splits > 1:
@@ -166,18 +167,18 @@ def kfold_split(
     out_dir = root / 'splits'
     out_dir.mkdir(exist_ok=True)
 
-    for i, split in enumerate(splits):
+    for i, split in enumerate(tqdm(splits)):
         train_coco, val_coco = copy_annotations(coco, files, split)
 
         if split is None:
-            with open(out_dir / f'trainval_{name}.json', 'w') as f:
+            with open(out_dir / f'trainval.json', 'w') as f:
                 json.dump(val_coco, f, indent=2)
             continue
 
-        with open(out_dir / f'train_{name}_{i}.json', 'w') as f:
+        with open(out_dir / f'train_{i}.json', 'w') as f:
             json.dump(train_coco, f, indent=2)
 
-        with open(out_dir / f'val_{name}_{i}.json', 'w') as f:
+        with open(out_dir / f'val_{i}.json', 'w') as f:
             json.dump(val_coco, f, indent=2) 
 
 
@@ -186,34 +187,25 @@ def split(
     coco: COCO,
     n_splits: int,
     test_size: float=0.0,
-    name: str='',
 ):
     files = sorted([img['file_name'] for img in coco.dataset['images']])
-    filename2id = {img['file_name']: img['id'] for img in coco.dataset['images']}
-    tagid2name = {tag['id']: tag['name'] for tag in coco.dataset['tag_categories']}
-    tags = [[tagid2name[tag_id] for tag_id in coco.imgs[filename2id[file]]['tag_ids']] for file in files]
 
     if test_size > 0:
-        files = test_split(
-            root, files, tags, test_size, name,
-        )
+        files = test_split(root, files, test_size)
 
-    kfold_split(root, coco, n_splits, files, name)
+    kfold_split(root, coco, n_splits, files)
 
 
 if __name__ == '__main__':
-    root = Path('odontoai')
-    out_dir = Path('data/odonto')
+    root = Path('../data/odontoai')
+    out_dir = Path('../data/odontoai/bitewings')
 
-    coco_path = combine_train_val(root, out_dir)
-    coco = COCO(coco_path)
-    coco_path = select_bitewings(coco, out_dir)
-
-    coco = COCO(root / 'odonto_bitewings.json')
+    coco = combine_train_val(root, out_dir)
+    coco = select_bitewings(root, coco, out_dir)
+    
     split(
-        root,
+        out_dir,
         coco,
         n_splits=5,
         test_size=0.0,
-        name='odonto_enumeration',
     )

@@ -203,8 +203,7 @@ model = dict(
         mask_head=dict(num_classes=len(classes)),
     ),
 )
-load_from = 'checkpoints/mask-rcnn_swin-t.pth'
-load_from = 'work_dirs/odonto_bitewings_maskrcnn/epoch_50.pth'
+load_from = '../checkpoints/maskrcnn_odonto.pth'
 
 max_epochs = 50
 train_cfg = dict(

@@ -19,13 +19,9 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-synmedico_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_train/'
-nijmegen_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_test/'
-ai_dental_root = '/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_extra/'
-mihai_root = '/home/mkaailab/Documents/Xray/Mihai/'
-split = 'lingyun_bitewings'
+root = '../data/Netherlands/'
 fold = 1
-work_dir = f'work_dirs/lingyun_trainval_hierarchical/'
+work_dir = 'work_dirs/chart_filing_hierarchical/'
 phase = 'train'
 merge_layers = True
 share_mlp = True
@@ -34,9 +30,6 @@ classes = [
     'tooth',
 ]
 
-attributes = [
-    'pontic', 'implants', 'crowns', 'fillings', 'roots', 'caries', 'calculus'
-]
 attributes = [
     'implants', 'crowns', 'pontic', 'fillings', 'roots', 'caries', 'calculus'
 ]
@@ -91,37 +84,22 @@ train_dataloader = dict(
     persistent_workers=False,
     dataset=dict(dataset=dict(
         pipeline=train_pipeline,
-        dataset=dict(_delete_=True, type='ConcatDataset', datasets=[
-            dict(
-                type='CocoMulticlassDataset',
-                strict=True,
-                decode_masks=False,
-                ann_file=synmedico_root + f'trainval_synmedico.json',
-                data_prefix=dict(img=synmedico_root + 'images'),
-                data_root=synmedico_root,
-                metainfo=dict(classes=classes, attributes=attributes),
-                merge_layers=merge_layers,
-                pipeline=[
-                    dict(type='LoadImageFromFile'),
-                    dict(type='LoadMulticlassAnnotations', merge_layers=merge_layers, with_bbox=True, with_mask=True),
-                ],
-            ),
-            dict(
-                type='CocoMulticlassDataset',
-                strict=True,
-                decode_masks=False,
-                ann_file=nijmegen_root + f'trainval_nijmegen.json',
-                data_prefix=dict(img=nijmegen_root + 'images'),
-                data_root=nijmegen_root,
-                metainfo=dict(classes=classes, attributes=attributes),
-                merge_layers=merge_layers,
-                pipeline=[
-                    dict(type='LoadImageFromFile'),
-                    dict(type='LoadMulticlassAnnotations', merge_layers=merge_layers, with_bbox=True, with_mask=True),
-                ],
-            ),
-        ],
-    ))),
+        dataset=dict(
+            _delete_=True,
+            type='CocoMulticlassDataset',
+            strict=True,
+            decode_masks=False,
+            ann_file=f'splits/train_fdi_{fold}.json',
+            data_prefix=dict(img='images'),
+            data_root=root,
+            metainfo=dict(classes=classes, attributes=attributes),
+            merge_layers=merge_layers,
+            pipeline=[
+                dict(type='LoadImageFromFile'),
+                dict(type='LoadMulticlassAnnotations', merge_layers=merge_layers, with_bbox=True, with_mask=True),
+            ],
+        ),
+    )),
 )
 
 val_pipeline = [
@@ -146,10 +124,9 @@ val_dataloader = dict(
         type='CocoMulticlassDataset',
         strict=True,
         decode_masks=False,
-        # ann_file=ai_dental_root + f'val_ai-dental_1.json',
-        ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/diffs.json',
-        data_prefix=dict(img=ai_dental_root + 'images'),
-        data_root=ai_dental_root,
+        ann_file=f'splits/val_fdi_{fold}.json',
+        data_prefix=dict(img='images'),
+        data_root=root,
         metainfo=dict(classes=classes, attributes=attributes),
         merge_layers=merge_layers,
         pipeline=val_pipeline,
@@ -170,10 +147,6 @@ val_evaluator = [
     ),
 ]
 
-# val_dataloader = None
-# val_evaluator = None
-# val_cfg = None
-
 test_dataloader = dict(
     num_workers=0,
     persistent_workers=False,
@@ -182,24 +155,14 @@ test_dataloader = dict(
         strict=True,
         num_workers=0,
         decode_masks=False,
-        # ann_file=data_root + f'val_{split}_{fold}.json',
-        ann_file='/home/mkaailab/.darwin/datasets/mucoaid/bitewingchartfiling_diff2/diffs.json',
-        # ann_file=mihai_root + 'coco.json',
-        data_prefix=dict(img=ai_dental_root + 'images'),
-        # data_prefix=dict(img=mihai_root),
-        data_root=ai_dental_root,
-        # data_root=mihai_root,
+        ann_file=f'splits/val_fdi_{fold}.json',
+        data_prefix=dict(img='images'),
+        data_root=root,
         metainfo=dict(classes=classes, attributes=attributes),
         pipeline=val_pipeline,
     ),
 )
 test_evaluator = [
-    # dict(
-    #     type='CocoMulticlassMetric',
-    #     metric=['bbox', 'segm'],
-    #     class_agnostic=True,
-    #     prefix='class_agnostic',
-    # ),
     dict(
         type='CocoRelevantMulticlassMetric',
         metric=['bbox', 'segm'],
@@ -207,11 +170,6 @@ test_evaluator = [
         prefix='fdi_label',
         classwise=True,
     ),
-    # dict(
-    #     type='AggregateLabelMetric',
-    #     label_idxs=range(1, len(classes + attributes)),
-    #     prefixes=(classes + attributes)[1:]
-    # ),
     dict(
         type='DumpMulticlassDetResults',
         score_thr=0.0,
@@ -279,5 +237,4 @@ default_hooks = dict(
 
 visualizer = dict(type='MulticlassDetLocalVisualizer')
 
-load_from = 'work_dirs/odonto_bitewings_enumeration/epoch_50.pth'
-# load_from = 'work_dirs/lingyun_trainval_hierarchical/epoch_27 (copy).pth'
+load_from = '../checkpoints/maskdino_odonto.pth'

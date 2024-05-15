@@ -1,5 +1,4 @@
 from collections import defaultdict
-import itertools
 from pathlib import Path
 
 import numpy as np
@@ -71,14 +70,7 @@ def process_dataset(coco: COCO):
 
 
 if __name__ == '__main__':
-    for dataset in [
-        Path('data/Germany'),
-        Path('data/Netherlands'),
-        Path('data/Slovakia'),
-    ]:
-        coco = COCO(dataset / 'annotations_fdi.json')
-
-        process_dataset(coco)
-
-    # annotation explanation
-    '8CFA4C19-D474-4C5F-9570-017FC90F274A.jpg'
+    root = Path('../data/Netherlands')
+    
+    coco = COCO(root / 'annotations_fdi.json')
+    process_dataset(coco)

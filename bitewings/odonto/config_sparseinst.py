@@ -89,6 +89,5 @@ optim_wrapper = dict(
     optimizer=dict(_delete_=True, type='AdamW', lr=0.00005, weight_decay=0.05))
 
 
-load_from = 'checkpoints/sparseinst_r50.pth'
+load_from = '../checkpoints/sparseinst_coco.pth'
 work_dir = 'work_dirs/odonto_bitewings_sparseinst'
-

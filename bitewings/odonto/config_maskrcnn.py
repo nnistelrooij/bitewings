@@ -1,5 +1,4 @@
 _base_ = './config_maskdino.py'
-# _base_ = './maskdino_swin-l_coco_multilabel.py'
 
 # model settings
 model = dict(
@@ -130,5 +129,5 @@ model = dict(
             max_per_img=100,
             mask_thr_binary=0.5)))
 
-load_from = 'checkpoints/mask-rcnn_r50.pth'
+load_from = '../checkpoints/maskrcnn_coco.pth'
 work_dir = 'work_dirs/odonto_bitewings_maskrcnn'

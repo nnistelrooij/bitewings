@@ -18,8 +18,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-odonto_root = 'data/odonto'
-split = 'odonto_enumeration'
+odonto_root = '../data/odontoai/bitewings/'
 fold = 1
 work_dir = 'work_dirs/odonto_bitewings_maskdino/'
 
@@ -38,8 +37,8 @@ train_dataloader = dict(
         dataset=dict(
             dataset=dict(
                 type='CocoDataset',
-                ann_file=odonto_root + f'trainval_{split}.json',
-                data_prefix=dict(img=odonto_root + 'images'),
+                ann_file='splits/trainval.json',
+                data_prefix=dict(img='images'),
                 data_root=odonto_root,
                 metainfo=dict(classes=classes),
                 pipeline=[
@@ -62,8 +61,8 @@ val_dataloader = dict(
     persistent_workers=False,
     dataset=dict(
         type='CocoDataset',
-        ann_file=odonto_root + f'val_{split}_{fold}.json',
-        data_prefix=dict(img=odonto_root + 'images'),
+        ann_file=f'splits/val_{fold}.json',
+        data_prefix=dict(img='images'),
         data_root=odonto_root,
         metainfo=dict(classes=classes),
         pipeline=[
@@ -80,7 +79,7 @@ val_dataloader = dict(
 val_evaluator = dict(
     _delete_=True,
     type='CocoMetric',
-    ann_file=odonto_root + f'val_{split}_{fold}.json',
+    ann_file=odonto_root + f'splits/val_{fold}.json',
     # ann_file=odonto_root + 'annotations/instances_val2017_onesample_139.json',  # TODO: delete before merging
     metric=['bbox', 'segm'],
 )
@@ -107,14 +106,7 @@ model = dict(
         num_stuff_classes=0,
     ),
 )
-
-tta_model = dict(
-    type='DENTEXTTAModel',
-    tta_cfg=dict(
-        nms=dict(type='nms', iou_threshold=0.5),
-        max_per_img=100,
-    ),
-)
+load_from = '../checkpoints/maskdino_coco.pth'
 
 default_hooks = dict(
     checkpoint=dict(save_best='coco/segm_mAP'),

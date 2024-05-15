@@ -78,7 +78,7 @@ model = dict(
             loss_weight=2.0),
     ),
     test_cfg=dict(score_thr=0.005, mask_thr_binary=0.45))
-load_from = 'work_dirs/odonto_bitewings_sparseinst/epoch_50.pth'
+load_from = '../checkpoints/sparseinst_odonto.pth'
 
 train_dataloader = dict(
     num_workers=5,

@@ -24,7 +24,7 @@ export IN_DIR=`realpath <path>`
 PYTHONPATH=. python \
   mmdetection/tools/test.py \
   bitewings/configs/config_<model>.py \
-  ../checkpoints/hierarchical.pth \
+  ../checkpoints/<model>_chartfiling.pth \
   --cfg-options \
     test_dataloader.dataset.data_root=$IN_DIR \
     test_dataloader.dataset.data_prefix.img=$IN_DIR \
@@ -36,7 +36,9 @@ The predictions can be converted to COCO by running `bitewings/inference/mmdet2c
 
 ## OdontoAI pretraining
 
-**Preprocessing** Unzip the downloaded data from the OdontoAI platform to the root folder of this repository and run `bitewings/odonto/preprocess.py` to combine the train and validation images and to split the data.
+If you would like to skip this step, model checkpoints pre-trained on COCO and OdontoAI are made available on request.
+
+**Preprocessing** Unzip the downloaded data from the OdontoAI platform to the `../data/` folder and run `bitewings/odonto/preprocess.py` to combine the train and validation images and to split the data.
 
 **Training** Following the preprocessing, the Mask DINO, Mask R-CNN, and SparseInst models can be pretrained by running the following command:
 
@@ -51,14 +53,14 @@ choosing a model architecture for `<model>`. The training run will be logged usi
 
 ### Preprocessing
 
-Unzip the downloaded data collected for the study to the `data/` folder. As the teeth and tooth findings were annotated independently, each tooth finding needs to matched to a tooth with corresponding FDI number. Please run `bitewings/preprocess/assign_fdis.py` to automatically assign tooth findings to teeth. Subsequently, `bitewings/preprocess/split_images.py` can be run to split the images into train, validation, and test.
+Unzip the downloaded data collected from The Netherlands to the `../data/` folder. As the teeth and tooth findings were annotated independently, each tooth finding needs to be matched to a tooth with corresponding FDI number. Please run `bitewings/preprocess/preprocess.py` to automatically assign tooth findings to teeth and to split the images into train, validation, and test.
 
-Furthermore, `bitewings/preprocess/intensities.py` and `bitewings/preprocess/prevalences.py` can be run to visualize the intensity distribution and tooth finding prevalances of the bitewings from each nationality.
+Furthermore, `bitewings/preprocess/intensities.py` and `bitewings/preprocess/prevalences.py` can be run to visualize the intensity distribution and to show the tooth finding prevalances of the bitewings from The Netherlands. Please note that the data from The Netherlands does not include implants.
 
 
 ### Training
 
-A pretrained model can be fine-tuned on bitewings from Germany and The Netherlands using the following command:
+After pretraining a model on the OdontoAI dataset, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_odonto.pth`, after which it can be fine-tuned on the bitewings from The Netherlands using the following command:
 
 ```bash
 PYTHONPATH=. python mmdetection/tools/train.py bitewings/configs/config_<model>.py
