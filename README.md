@@ -20,15 +20,15 @@ The panoramic radiographs from the OdontoAI platform can be requested from [the 
 To run the model on your own bitewings, first make an empty COCO file by running `bitewings/inference/init_images.py`. The model can be run on these images using this command:
 
 ```bash
-export IN_DIR=`realpath <path>`
+export IN_DIR=`realpath "<path>"`
 PYTHONPATH=. python \
   mmdetection/tools/test.py \
   bitewings/configs/config_<model>.py \
   ../checkpoints/<model>_chartfiling.pth \
   --cfg-options \
-    test_dataloader.dataset.data_root=$IN_DIR \
-    test_dataloader.dataset.data_prefix.img=$IN_DIR \
-    test_dataloader.dataset.ann_file=$IN_DIR/coco.json
+    test_dataloader.dataset.data_root="$IN_DIR" \
+    test_dataloader.dataset.data_prefix.img="$IN_DIR" \
+    test_dataloader.dataset.ann_file="$IN_DIR/coco.json"
 ```
 
 choosing the input directory for `<path>` and a model architecture for `<model>`. The predictions can be converted to COCO by running `bitewings/inference/mmdet2coco.py`. Afterward, the annotations can be visualized by running `bitewings/inference/show_anns.py` or `bitewings/visualization/side_by_side.py`. One example bitewing has been added in the `test/` folder with which you can run the models and show the prediction results.

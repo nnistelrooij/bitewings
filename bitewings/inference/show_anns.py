@@ -8,6 +8,21 @@ from pycocotools.coco import COCO
 import pycocotools.mask as maskUtils
 
 
+def coco_to_rle(ann, h, w):
+    if isinstance(ann, list):
+        # polygon -- a single object might consist of multiple parts
+        # we merge all parts into one mask rle code
+        rles = maskUtils.frPyObjects(ann, h, w)
+        return maskUtils.merge(rles)
+    
+    if isinstance(ann['counts'], list):
+        # uncompressed RLE
+        return maskUtils.frPyObjects(ann, h, w)
+    
+    # rle
+    return ann
+
+
 def main(in_dir: Path, coco_path: Path):
     coco = COCO(coco_path)
 
@@ -19,7 +34,8 @@ def main(in_dir: Path, coco_path: Path):
 
         anns = coco.imgToAnns[img_id]
         for ann in anns:
-            mask = maskUtils.decode(ann['segmentation'])
+            rle = coco_to_rle(ann['segmentation'], img_dict['height'], img_dict['width'])
+            mask = maskUtils.decode(rle)
             mask = np.concatenate((np.zeros_like(mask), mask), axis=1)
             rle = maskUtils.encode(np.asfortranarray(mask))
             ann['segmentation'] = {

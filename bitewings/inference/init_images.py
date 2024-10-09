@@ -8,6 +8,7 @@ import cv2
 
 def main(
     in_dir: Path,
+    num_images: int,
     img_suffixes: List[str]=[
         '.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif',
     ],
@@ -21,6 +22,9 @@ def main(
     idx = 0
     for file_path in in_dir.glob('*'):
         if file_path.suffix not in img_suffixes:
+            continue
+
+        if idx == num_images:
             continue
 
         img = cv2.imread(str(file_path))
@@ -44,6 +48,10 @@ if __name__ == '__main__':
         'in_dir', default='.', type=Path,
         help='Path to folder with images for prediction.',
     )
+    parser.add_argument(
+        '--num_images', default=-1, type=int, required=False,
+        help='Number of images to prepare.',
+    )
     args = parser.parse_args()
 
-    main(args.in_dir)
+    main(args.in_dir, args.num_images)

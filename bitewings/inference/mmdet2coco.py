@@ -1,17 +1,54 @@
 import argparse
+import copy
 import json
-from multiprocessing import Pool
+import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
+import cv2
 import numpy as np
 import pickle
 import pycocotools.mask as maskUtils
+from scipy import ndimage
 import torch
 from tqdm import tqdm
 
-from mmdet.models.layers import mask_matrix_nms
-from mmcv.ops import batched_nms
+
+
+def rle_to_coco(annotation: dict) -> list[dict]:
+    """Transform the rle coco annotation (a single one) into coco style.
+    In this case, one mask can contain several polygons, later leading to several `Annotation` objects.
+    In case of not having a valid polygon (the mask is a single pixel) it will be an empty list.
+    Parameters
+    ----------
+    annotation : dict
+        rle coco style annotation
+    Returns
+    -------
+    list[dict]
+        list of coco style annotations (in dict format)
+    """
+    maskedArr = maskUtils.decode(annotation["segmentation"])
+    maskedArr = ndimage.binary_closing(maskedArr, ndimage.generate_binary_structure(2, 2))
+    contours, _ = cv2.findContours(maskedArr.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    segmentation = []
+
+    for contour in contours:
+        if contour.size >= 6:
+            segmentation.append(contour)
+
+    if len(segmentation) == 0:
+        logging.debug(
+            f"Annotation with id {annotation['id']} is not valid, it has no segmentations."
+        )
+        return []
+
+    else:
+        annotation = copy.deepcopy(annotation)
+        annotation['segmentation'] = [
+            seg.astype(float).flatten().tolist() for seg in segmentation
+        ]
+        return [annotation]
 
 
 def mask_decode(
@@ -77,8 +114,6 @@ def convert_to_coco_maskdino(
     })
     catname2id = {cat['name']: cat['id'] for cat in coco_dict['categories']}
 
-    print(result['img_path'].name)
-
     class_names = [
         'tooth', 'implants', 'crowns', 'pontic', 'fillings', 'roots', 'caries', 'calculus',
     ]
@@ -94,7 +129,7 @@ def convert_to_coco_maskdino(
             if area == 0.0:
                 continue
             wolla = f'{attr}_{label[-2:]}'
-            coco_dict['annotations'].append({
+            ann = {
                 'id': len(coco_dict['annotations']) + 1,
                 'image_id': result['img_id'],
                 'score': result['scores'][idx].item(),
@@ -106,7 +141,8 @@ def convert_to_coco_maskdino(
                 'area': maskUtils.area(rle).item(),
                 'bbox': maskUtils.toBbox(rle).tolist(),
                 'iscrowd': 0,
-            })
+            }
+            coco_dict['annotations'].extend(rle_to_coco(ann))
 
 
 def convert_to_coco_maskrcnn(
@@ -170,14 +206,17 @@ def ensemble_detections(
             for i, label in enumerate(classes)
         ],
     }
-    for image_results in tqdm(
+    t = tqdm(
         iterable=zip(*fold_results),
         total=len(fold_results[0]),
-    ):
+    )
+    for image_results in t:
+
         result, keep_idxs = filter_results(
             image_results,
             score_thr=score_thr,
         )
+        t.set_description(result['img_path'].name)
 
         convert_to_coco_maskdino(result, keep_idxs, coco_dict, classes)
         # convert_to_coco_maskrcnn(result, keep_idxs, coco_dict, classes)
