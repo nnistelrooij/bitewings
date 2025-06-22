@@ -85,11 +85,12 @@ Further metrics for tooth segmentation and labeling can be computed by running `
 ## Citation
 
 ```
-@article{bitewing_chart_filing,
-  title={Comprehensive Bitewing Chart Filing using Hierarchical End-to-End Vision Transformer: A Multi-Center Study},
-  author={Cao, Lingyun and van Nistelrooij, Niels},
-  year={2024},
-  journal={Computers in Biology and Medicine},
-  note={In press}
+@article{CAO2025105919,
+  title = {Automated Chart Filing on Bitewings Using Deep Learning: Enhancing Clinical Diagnosis in a Multi-Center Study},
+  journal = {Journal of Dentistry},
+  pages = {105919},
+  year = {2025},
+  doi = {https://doi.org/10.1016/j.jdent.2025.105919},
+  author = {Lingyun Cao and Niels {van Nistelrooij} and Eduardo Trota Chaves and Stefaan Bergé and Maximiliano Sergio Cenci and Tong Xi and Bas Loomans and Shankeeth Vinayahalingam}
 }
 ```
