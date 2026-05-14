@@ -1,5 +1,9 @@
-_base_ = '../../mmdetection/projects/DENTEX/configs/maskdino_r50_coco_multilabel.py'
-# _base_ = './maskdino_swin-l_coco_multilabel.py'
+import sys
+
+_base_ = '../../onedl-mmdetection/projects/DENTEX/configs/maskdino_r50_coco_multilabel.py'
+
+sys.path.append('.')
+sys.path.append('onedl-mmdetection')
 
 custom_imports = dict(
     imports=[

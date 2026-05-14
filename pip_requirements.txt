@@ -4,10 +4,8 @@ scikit-multilearn @ git+https://github.com/scikit-multilearn/scikit-multilearn.g
 seaborn==0.13.2
 SimpleITK==2.5.5
 tensorboard==2.20.0
+-f https://download.pytorch.org/whl/cu129/torch-2.10.0%2Bcu129-cp312-cp312-manylinux_2_28_x86_64.whl
+torch==2.10.0
 -f https://download.pytorch.org/whl/cu129
-torch==2.8.0
--f https://download.pytorch.org/whl/cu129
-torchvision==0.23.0
--f https://data.pyg.org/whl/torch-2.8.0+cu129.html
-torch-scatter
+torchvision==0.25.0
 yapf==0.43.0

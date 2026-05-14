@@ -1,6 +1,6 @@
 ## Make a new conda environment
 ```bash
-conda create -n bitewings python=3.10
+conda create -n bitewings python=3.12
 conda activate bitewings
 ```
 

@@ -2,7 +2,7 @@
 
 Comprehensive bitewing chart filing using hierarchical instance segmentation.
 
-This code is implemented using MMDetection (v.3.0.0) based on PyTorch 2.0.1.
+This code is implemented using OneDL-MMDetection (v.3.5.1) based on PyTorch 2.10.0.
 
 
 ## Installation
@@ -21,10 +21,10 @@ To run the model on your own bitewings, first make an empty COCO file by running
 
 ```bash
 export IN_DIR=`realpath "<path>"`
-PYTHONPATH=. python \
-  mmdetection/tools/test.py \
+python \
+  onedl-mmdetection/tools/test.py \
   bitewings/configs/config_<model>.py \
-  ../checkpoints/<model>_chartfiling.pth \
+  checkpoints/<model>_chartfiling.pth \
   --cfg-options \
     test_dataloader.dataset.data_root="$IN_DIR" \
     test_dataloader.dataset.data_prefix.img="$IN_DIR" \
@@ -43,7 +43,7 @@ If you would like to skip this step, model checkpoints pre-trained on COCO and O
 **Training** Following the preprocessing, the Mask DINO, Mask R-CNN, and SparseInst models can be pre-trained by running the following command:
 
 ```bash
-PYTHONPATH=. python mmdetection/tools/train.py bitewings/odonto/config_<model>.py
+PYTHONPATH=. python onedl-mmdetection/tools/train.py bitewings/odonto/config_<model>.py
 ```
 
 choosing a model architecture for `<model>`. The training run will be logged using TensorBoard and the checkpoints and logging files will be stored in `work_dirs/odonto_bitewings_<model>`.
@@ -63,7 +63,7 @@ Furthermore, `bitewings/preprocess/intensities.py` and `bitewings/preprocess/pre
 After pre-training a model on the OdontoAI dataset, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_odonto.pth`, after which it can be fine-tuned on the bitewings from The Netherlands using the following command:
 
 ```bash
-PYTHONPATH=. python mmdetection/tools/train.py bitewings/configs/config_<model>.py
+PYTHONPATH=. python onedl-mmdetection/tools/train.py bitewings/configs/config_<model>.py
 ```
 
 choosing a model architecture for `<model>`. Please note that the hierarchical instance segmentation method requires at least 20 GPU hours to complete training.
@@ -74,7 +74,7 @@ choosing a model architecture for `<model>`. Please note that the hierarchical i
 After fine-tuning a model on the data from The Netherlands, the model checkpoint in the working directory can be copied to `../checkpoints/<model>_chartfiling.pth`. A fine-tuned model can be evaluated using the following command:
 
 ```bash
-PYTHONPATH=. python mmdetection/tools/test.py bitewings/configs/config_<model>.py ../checkpoints/<model>_chartfiling.pth
+PYTHONPATH=. python onedl-mmdetection/tools/test.py bitewings/configs/config_<model>.py ../checkpoints/<model>_chartfiling.pth
 ```
 
 choosing a model architecture for `<model>`. This will produce mean average precision (mAP) metrics for tooth segmentation and labeling and the results will be written to a pickle file in the working directory.
