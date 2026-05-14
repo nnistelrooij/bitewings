@@ -1,2 +1,2 @@
-mmengine==0.8.4
-mmcv==2.0.1
+onedl-mmengine==0.10.10
+onedl-mmcv==2.3.6
