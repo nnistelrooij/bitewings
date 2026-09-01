@@ -12,7 +12,7 @@ See `INSTALL.md` for installation instructions.
 
 ## Data and checkpoints
 
-The panoramic radiographs from the OdontoAI platform can be requested from [the platform's website](https://odontoai.com/). Furthermore, model checkpoints and the data collected for the study can be requested from Niels van Nistelrooij (Niels dot vanNistelrooij at radboudumc dot nl).
+The panoramic radiographs from the OdontoAI platform can be requested from [the platform's website](https://odontoai.com/). Furthermore, model checkpoints and the data collected for the study can be requested at the [Radboud Data Repository](https://doi.org/10.34973/1bf3-j248).
 
 
 ## Inference
